@@ -19,18 +19,26 @@ class SignupScreen extends StatefulWidget {
 class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  String? _errorMessage;
+  String? _emailError;
+  String? _passwordError;
+  String? _confirmError;
+  String? _generalError;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   @override
   void initState() {
     super.initState();
-    Firebase.initializeApp().whenComplete(() {
-      setState(() {});
-    }).catchError((e) {
-      print('Firebase initialization error: $e');
-    });
+    Firebase.initializeApp()
+        .whenComplete(() {
+          setState(() {});
+        })
+        .catchError((e) {
+          print('Firebase initialization error: $e');
+        });
   }
 
   Future<String> generateVerificationCode() async {
@@ -52,7 +60,8 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   Future<void> sendVerificationEmail(String email, String code) async {
-    const String apiKey = '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';
+    const String apiKey =
+        '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';
     final url = Uri.parse('https://api.brevo.com/v3/smtp/email');
 
     try {
@@ -68,16 +77,26 @@ class _SignupScreenState extends State<SignupScreen> {
           'Accept': 'application/json',
         },
         body: jsonEncode({
-          'sender': {'name': 'NutriCycle', 'email': 'micodelacruz519@gmail.com'}, // Replace with verified email
-          'to': [{'email': email, 'name': 'User'}],
+          'sender': {
+            'name': 'NutriCycle',
+            'email': 'micodelacruz519@gmail.com',
+          },
+          'to': [
+            {'email': email, 'name': 'User'},
+          ],
           'subject': 'Your Verification Code',
-          'htmlContent': '<h1>Verification Code</h1><p>Your verification code is <strong>${code}</strong>. Please enter it to complete your sign-up.</p>',
+          'htmlContent':
+              '<h1>Verification Code</h1><p>Your verification code is <strong>$code</strong>. Please enter it to complete your sign-up.</p>',
         }),
       );
 
-      print('API Response Status: ${response.statusCode}, Body: ${response.body}');
+      print(
+        'API Response Status: ${response.statusCode}, Body: ${response.body}',
+      );
       if (response.statusCode != 201) {
-        throw Exception('Failed to send email. Status: ${response.statusCode}, Message: ${response.body}');
+        throw Exception(
+          'Failed to send email. Status: ${response.statusCode}, Message: ${response.body}',
+        );
       }
     } catch (e) {
       print('Error in sendVerificationEmail: $e');
@@ -86,38 +105,85 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   Future<void> _signUp() async {
-    if (_passwordController.text.trim() != _confirmPasswordController.text.trim()) {
-      setState(() {
-        _errorMessage = 'Passwords do not match.';
-      });
+    String email = _emailController.text.trim();
+    String password = _passwordController.text.trim();
+    String confirmPassword = _confirmPasswordController.text.trim();
+
+    bool hasError = false;
+
+    setState(() {
+      _emailError = null;
+      if (email.isEmpty) {
+        _emailError = 'Email is required.';
+        hasError = true;
+      } else if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+        _emailError = 'Invalid email format.';
+        hasError = true;
+      }
+
+      _passwordError = null;
+      if (password.isEmpty) {
+        _passwordError = 'Password is required.';
+        hasError = true;
+      } else if (password.length < 8) {
+        _passwordError = 'Password must be at least 8 characters.';
+        hasError = true;
+      } else if (!RegExp(
+        r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$',
+      ).hasMatch(password)) {
+        _passwordError =
+            'Password must include uppercase, lowercase, number, and special character.';
+        hasError = true;
+      }
+
+      _confirmError = null;
+      if (confirmPassword != password) {
+        _confirmError = 'Passwords do not match.';
+        hasError = true;
+      }
+
+      _generalError = null;
+    });
+
+    if (hasError) {
       return;
     }
 
     try {
       await checkConnectivity();
       await _auth.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+        email: email,
+        password: password,
       );
       final code = await generateVerificationCode();
-      print('Sending initial code $code to ${_emailController.text.trim()}');
-      await sendVerificationEmail(_emailController.text.trim(), code);
+      print('Sending initial code $code to $email');
+      await sendVerificationEmail(email, code);
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => VerificationScreen(
-            email: _emailController.text.trim(),
-            verificationCode: code,
-          ),
+          builder:
+              (context) =>
+                  VerificationScreen(email: email, verificationCode: code),
         ),
       );
     } on FirebaseAuthException catch (e) {
-      setState(() {
-        _errorMessage = _getErrorMessage(e.code);
-      });
+      String errorMessage = _getErrorMessage(e.code);
+      if (e.code == 'invalid-email' || e.code == 'email-already-in-use') {
+        setState(() {
+          _emailError = errorMessage;
+        });
+      } else if (e.code == 'weak-password') {
+        setState(() {
+          _passwordError = errorMessage;
+        });
+      } else {
+        setState(() {
+          _generalError = errorMessage;
+        });
+      }
     } catch (e) {
       setState(() {
-        _errorMessage = 'An unexpected error occurred. Please try again.';
+        _generalError = 'An unexpected error occurred. Please try again.';
       });
     }
   }
@@ -161,7 +227,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   children: [
                     const SizedBox(height: 60),
                     Image.asset(
-                      'assets/nutricyclelogo.png',
+                      'assets/Logo.png',
                       width: 100,
                       height: 100,
                       fit: BoxFit.contain,
@@ -195,11 +261,40 @@ class _SignupScreenState extends State<SignupScreen> {
                           labelStyle: const TextStyle(
                             fontFamily: 'Poppins',
                             color: Color(0xFF0B440E),
+                            fontWeight: FontWeight.w500
                           ),
+                          filled: true,
+                          fillColor: Colors.white,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF0B440E),
+                              width: 0.5,
+                            ),
                           ),
-                          errorText: _errorMessage,
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF0B440E),
+                              width: 0.5,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF0B440E),
+                              width: 1,
+                            ),
+                          ),
+                          errorText: _emailError,
+                          errorStyle: const TextStyle(
+                            color: Colors.red,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                        style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          color: Color(0xFF0B440E),
                         ),
                         keyboardType: TextInputType.emailAddress,
                       ),
@@ -209,16 +304,59 @@ class _SignupScreenState extends State<SignupScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: TextField(
                         controller: _passwordController,
-                        obscureText: true,
+                        obscureText: _obscurePassword,
                         decoration: InputDecoration(
                           labelText: 'Enter your Password',
                           labelStyle: const TextStyle(
                             fontFamily: 'Poppins',
                             color: Color(0xFF0B440E),
+                            fontWeight: FontWeight.w500,
                           ),
+                          filled: true,
+                          fillColor: Colors.white,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF0B440E),
+                              width: 0.5,
+                            ),
                           ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF0B440E),
+                              width: 0.5,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF0B440E),
+                              width: 1,
+                            ),
+                          ),
+                          errorText: _passwordError,
+                          errorStyle: const TextStyle(
+                            color: Colors.red,
+                            fontFamily: 'Poppins',
+                          ),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                              color: Color(0xFF0B440E),
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _obscurePassword = !_obscurePassword;
+                              });
+                            },
+                          ),
+                        ),
+                        style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          color: Color(0xFF0B440E),
                         ),
                       ),
                     ),
@@ -227,25 +365,86 @@ class _SignupScreenState extends State<SignupScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: TextField(
                         controller: _confirmPasswordController,
-                        obscureText: true,
+                        obscureText: _obscureConfirmPassword,
                         decoration: InputDecoration(
                           labelText: 'Confirm your Password',
                           labelStyle: const TextStyle(
                             fontFamily: 'Poppins',
                             color: Color(0xFF0B440E),
+                            fontWeight: FontWeight.w500,
                           ),
+                          filled: true,
+                          fillColor: Colors.white,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF0B440E),
+                              width: 0.5,
+                            ),
                           ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF0B440E),
+                              width: 0.5,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF0B440E),
+                              width: 1,
+                            ),
+                          ),
+                          errorText: _confirmError,
+                          errorStyle: const TextStyle(
+                            color: Colors.red,
+                            fontFamily: 'Poppins',
+                          ),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureConfirmPassword
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                              color: Color(0xFF0B440E),
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _obscureConfirmPassword =
+                                    !_obscureConfirmPassword;
+                              });
+                            },
+                          ),
+                        ),
+                        style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          color: Color(0xFF0B440E),
                         ),
                       ),
                     ),
+                    if (_generalError != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 10,
+                        ),
+                        child: Text(
+                          _generalError!,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 30),
                     ElevatedButton(
                       onPressed: _signUp,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0B440E),
-                        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 40,
+                          vertical: 15,
+                        ),
                         fixedSize: const Size(283, 53),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(15),
@@ -283,10 +482,14 @@ class _SignupScreenState extends State<SignupScreen> {
                               fontWeight: FontWeight.w900,
                               color: Color(0xFF0B440E),
                             ),
-                            recognizer: TapGestureRecognizer()
-                              ..onTap = () {
-                                Navigator.pushNamed(context, '/login_screen');
-                              },
+                            recognizer:
+                                TapGestureRecognizer()
+                                  ..onTap = () {
+                                    Navigator.pushNamed(
+                                      context,
+                                      '/login_screen',
+                                    );
+                                  },
                           ),
                         ],
                       ),

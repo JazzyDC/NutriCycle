@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/gestures.dart'; // For TapGestureRecognizer
-import 'signup_screen.dart'; // Ensure this file exists
+import 'package:flutter/gestures.dart';
+import 'signup_screen.dart';
+import 'dashboard_screen.dart';
+import 'forgot_password/forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final String imageAsset;
 
-  const LoginScreen({this.imageAsset = 'assets/nutricyclelogo.png', super.key});
+  const LoginScreen({this.imageAsset = 'assets/Logo.png', super.key});
 
   @override
   _LoginScreenState createState() => _LoginScreenState();
@@ -18,32 +19,36 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   String? _errorMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    // Ensure Firebase is initialized
-    Firebase.initializeApp().whenComplete(() {
-      setState(() {});
-    });
-  }
+  bool _obscurePassword = true;
+  bool _isLoading = false;
 
   Future<void> _login() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
     try {
-      // Attempt to sign in with email and password
-      await _auth.signInWithEmailAndPassword(
+      UserCredential userCredential = await _auth.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-      // Navigate to home screen or another screen after successful login
-      Navigator.pushReplacementNamed(context, '/home'); // Replace with your home route
+      print('Login successful: ${userCredential.user?.email}');
+      // Wait briefly for auth state to propagate
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (mounted) {
+        // Navigate directly to dashboard
+        Navigator.pushReplacementNamed(context, '/dashboard');
+      }
     } on FirebaseAuthException catch (e) {
       setState(() {
         _errorMessage = _getErrorMessage(e.code);
+        _isLoading = false;
       });
     } catch (e) {
       setState(() {
-        _errorMessage = 'An unexpected error occurred. Please try again.';
+        _errorMessage = 'An unexpected error occurred: $e';
+        _isLoading = false;
       });
     }
   }
@@ -59,7 +64,7 @@ class _LoginScreenState extends State<LoginScreen> {
       case 'user-disabled':
         return 'This user account has been disabled.';
       default:
-        return 'An error occurred. Please try again.';
+        return 'An error occurred: $code';
     }
   }
 
@@ -115,16 +120,43 @@ class _LoginScreenState extends State<LoginScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: TextField(
                         controller: _emailController,
+                        enabled: !_isLoading,
                         decoration: InputDecoration(
                           labelText: 'Email Address',
                           labelStyle: const TextStyle(
                             fontFamily: 'Poppins',
+                            fontWeight: FontWeight.w500,
                             color: Color(0xFF0B440E),
                           ),
+                          filled: true,
+                          fillColor: Colors.white,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF0B440E),
+                              width: 0.5,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF0B440E),
+                              width: 0.5,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF0B440E),
+                              width: 1,
+                            ),
                           ),
                           errorText: _errorMessage,
+                          errorStyle: const TextStyle(fontFamily: 'Poppins'),
+                        ),
+                        style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          color: Color(0xFF2D2D2D),
                         ),
                         keyboardType: TextInputType.emailAddress,
                       ),
@@ -134,16 +166,58 @@ class _LoginScreenState extends State<LoginScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: TextField(
                         controller: _passwordController,
-                        obscureText: true,
+                        enabled: !_isLoading,
+                        obscureText: _obscurePassword,
                         decoration: InputDecoration(
                           labelText: 'Password',
                           labelStyle: const TextStyle(
                             fontFamily: 'Poppins',
+                            fontWeight: FontWeight.w500,
                             color: Color(0xFF0B440E),
                           ),
+                          filled: true,
+                          fillColor: Colors.white,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF0B440E),
+                              width: 0.5,
+                            ),
                           ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF0B440E),
+                              width: 0.5,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF0B440E),
+                              width: 1,
+                            ),
+                          ),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                              color: const Color(0xFF0B440E),
+                            ),
+                            onPressed: _isLoading
+                                ? null
+                                : () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                          ),
+                          errorStyle: const TextStyle(fontFamily: 'Poppins'),
+                        ),
+                        style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          color: Color(0xFF2D2D2D),
                         ),
                       ),
                     ),
@@ -151,27 +225,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: () async {
-                          if (_emailController.text.isEmpty) {
-                            setState(() {
-                              _errorMessage = 'Please enter an email address.';
-                            });
-                            return;
-                          }
-                          try {
-                            await _auth.sendPasswordResetEmail(
-                                email: _emailController.text.trim());
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('Password reset email sent!')),
-                            );
-                          } catch (e) {
-                            setState(() {
-                              _errorMessage =
-                                  'Failed to send reset email. Please try again.';
-                            });
-                          }
-                        },
+                        onPressed: _isLoading
+                            ? null
+                            : () {
+                                Navigator.pushNamed(context, '/forgot_password');
+                              },
                         child: const Text(
                           'Forgot password',
                           style: TextStyle(
@@ -185,25 +243,55 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 20),
                     ElevatedButton(
-                      onPressed: _login,
+                      onPressed: _isLoading ? null : _login,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0B440E),
+                        backgroundColor: _isLoading
+                            ? Colors.grey
+                            : const Color(0xFF0B440E),
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 40, vertical: 15),
+                          horizontal: 40,
+                          vertical: 15,
+                        ),
                         fixedSize: const Size(283, 53),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(20),
                         ),
                       ),
-                      child: const Text(
-                        'Login',
-                        style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFFFEF8C2),
-                        ),
-                      ),
+                      child: _isLoading
+                          ? Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Color(0xFFFEF8C2),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                const Text(
+                                  'Logging in...',
+                                  style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFFFEF8C2),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : const Text(
+                              'Login',
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFFFEF8C2),
+                              ),
+                            ),
                     ),
                     const SizedBox(height: 20),
                     RichText(
@@ -228,9 +316,14 @@ class _LoginScreenState extends State<LoginScreen> {
                               color: Color(0xFF0B440E),
                             ),
                             recognizer: TapGestureRecognizer()
-                              ..onTap = () {
-                                Navigator.pushNamed(context, '/signup_screen');
-                              },
+                              ..onTap = _isLoading
+                                  ? null
+                                  : () {
+                                      Navigator.pushNamed(
+                                        context,
+                                        '/signup_screen',
+                                      );
+                                    },
                           ),
                         ],
                       ),
