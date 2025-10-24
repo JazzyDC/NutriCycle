@@ -1,7 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/gestures.dart';
 import 'splash_screen_1.dart';
 import 'splash_screen_2.dart';
 import 'splash_screen_3.dart';
@@ -10,6 +9,8 @@ import 'signup_screen.dart';
 import 'verification_screen.dart';
 import 'dashboard_screen.dart';
 import 'forgot_password/forgot_password_screen.dart';
+import 'forgot_password/verification_screenpassword.dart';
+import 'processing_navigation_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -49,7 +50,9 @@ class MyApp extends StatelessWidget {
         '/login_screen': (context) => const LoginScreen(),
         '/signup_screen': (context) => const SignupScreen(),
         '/dashboard': (context) => const DashboardScreen(),
-        '/forgot_password': (context) => const ForgotPasswordScreen(), // Added route
+        '/forgot_password': (context) => const ForgotPasswordScreen(),
+        '/verification_screens': (context) => const VerificationSScreen(),
+        '/processing_navigation_screen': (context) => const ProcessingStatusScreen(),
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/verification_screen') {
@@ -57,24 +60,26 @@ class MyApp extends StatelessWidget {
           if (settings.arguments is Map<String, String>?) {
             final args = settings.arguments as Map<String, String>?;
             return MaterialPageRoute(
-              builder: (context) => VerificationScreen(
-                email: args?['email'] ?? '',
-                verificationCode: args?['verificationCode'] ?? '',
-              ),
+              builder:
+                  (context) => VerificationScreen(
+                    email: args?['email'] ?? '',
+                    verificationCode: args?['verificationCode'] ?? '',
+                  ),
             );
           }
           // Fallback for invalid arguments
           return MaterialPageRoute(
-            builder: (context) => const Scaffold(
-              body: Center(child: Text('Invalid verification arguments')),
-            ),
+            builder:
+                (context) => const Scaffold(
+                  body: Center(child: Text('Invalid verification arguments')),
+                ),
           );
         }
         // Improved fallback for unknown routes
         return MaterialPageRoute(
-          builder: (context) => const Scaffold(
-            body: Center(child: Text('Page not found')),
-          ),
+          builder:
+              (context) =>
+                  const Scaffold(body: Center(child: Text('Page not found'))),
         );
       },
     );

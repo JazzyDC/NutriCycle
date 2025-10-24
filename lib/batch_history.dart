@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart'; // Added for date formatting
 
 class BatchHistoryScreen extends StatefulWidget {
+  const BatchHistoryScreen({super.key});
+
   @override
   _BatchHistoryScreenState createState() => _BatchHistoryScreenState();
 }

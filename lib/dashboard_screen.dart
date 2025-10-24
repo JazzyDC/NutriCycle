@@ -5,7 +5,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'settings_screen.dart';
 import 'notifications_screen.dart';
 import 'inventory_screen.dart';
-import 'batch_history.dart'; // Import the batch_history.dart file
+import 'batch_history.dart';
+import 'processing_navigation_screen.dart'; // Import for ProcessingStatusScreen
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -26,8 +27,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     _screens = [
       _buildDashboardScreen(),
-      const Center(child: Text('Process Screen - Add your content here')),
-      BatchHistoryScreen(), // Replace with BatchHistoryScreen
+      const ProcessingStatusScreen(), // Linked to ProcessingStatusScreen
+      BatchHistoryScreen(),
       const SettingsScreen(),
     ];
   }
@@ -82,8 +83,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           Text(
                             _isConnected ? 'Connected' : 'Not Connected',
                             style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w400,
                               fontFamily: 'Poppins',
                               color: Color(0xFF0B440E),
                             ),
@@ -97,7 +98,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             : 'Connect to a NutriCycle machine to get started.',
                         textAlign: TextAlign.center,
                         style: const TextStyle(
-                          fontSize: 12,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
                           fontFamily: 'Poppins',
                           color: Color(0xFF0B440E),
                         ),
@@ -106,59 +108,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ElevatedButton(
                         onPressed: _handleConnectToMachine,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0B440E),
-                          foregroundColor: const Color(0xFFFEF8C2),
+                          foregroundColor: const Color(0xFF0B440E),
+                          side: const BorderSide(
+                            color: Color(0xFF0B440E),
+                            width: 2,
+                          ),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(15),
                           ),
                           padding: const EdgeInsets.symmetric(
-                              vertical: 10, horizontal: 20),
+                              vertical: 15, horizontal: 35),
+                          backgroundColor: Colors.transparent,
+                          elevation: 0,
                         ),
                         child: Text(
                           _isConnected ? 'Disconnect' : 'Connect to Machine',
                           style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
                             fontFamily: 'Poppins',
+                            color: Color(0xFF0B440E),
                           ),
                         ),
                       ),
                     ],
                   ),
           ),
-          const SizedBox(height: 18),
-          const Text(
-            'Quick Actions',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              fontFamily: 'Poppins',
-              color: Color(0xFF0B440E),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _buildActionButton(
-                  icon: Icons.power_settings_new,
-                  label: 'Turn on Machine',
-                  color: const Color(0xFF1B5E20),
-                  onTap: _isConnected ? () {} : null,
-                  isDisabled: !_isConnected,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _buildActionButton(
-                  icon: Icons.eco,
-                  label: 'Monitor Compost',
-                  color: const Color(0xFF1B5E20),
-                  onTap: () {},
-                ),
-              ),
-            ],
-          ),
+       
+         
           const SizedBox(height: 18),
           Container(
             decoration: BoxDecoration(

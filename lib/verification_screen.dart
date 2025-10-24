@@ -155,7 +155,7 @@
                       children: [
                         const SizedBox(height: 60),
                         Image.asset(
-                          'assets/nutricyclelogo.png',
+                          'assets/Logo.png',
                           width: 100,
                           height: 100,
                           fit: BoxFit.contain,

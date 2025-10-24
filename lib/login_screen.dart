@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/gestures.dart';
-import 'signup_screen.dart';
-import 'dashboard_screen.dart';
-import 'forgot_password/forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   final String imageAsset;
@@ -231,7 +228,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 Navigator.pushNamed(context, '/forgot_password');
                               },
                         child: const Text(
-                          'Forgot password',
+                          'Forgot password?',
                           style: TextStyle(
                             fontFamily: 'Poppins',
                             fontSize: 16,
