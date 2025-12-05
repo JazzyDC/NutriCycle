@@ -7,6 +7,6 @@ workflows:
     scripts:
       - flutter build ios --release
       - mkdir -p build/ios/ipa
-      - zip -r build/ios/ipa/Runner.app.zip build/ios/iphonesimulator/Runner.app
+      - zip -r build/ios/ipa/Runner.app.zip build/ios/iphonerelease/Runner.app
     artifacts:
       - build/ios/ipa/Runner.app.zip
