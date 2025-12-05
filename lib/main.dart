@@ -11,6 +11,8 @@ import 'dashboard_screen.dart';
 import 'forgot_password/forgot_password_screen.dart';
 import 'forgot_password/verification_screenpassword.dart';
 import 'processing_navigation_screen.dart';
+import 'recognition_screen.dart ';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -52,7 +54,8 @@ class MyApp extends StatelessWidget {
         '/dashboard': (context) => const DashboardScreen(),
         '/forgot_password': (context) => const ForgotPasswordScreen(),
         '/verification_screens': (context) => const VerificationSScreen(),
-        '/processing_navigation_screen': (context) => const ProcessingStatusScreen(),
+        
+        '/recognition_screen': (context) => const RecognitionScreen(),
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/verification_screen') {

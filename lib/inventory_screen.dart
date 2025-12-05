@@ -51,10 +51,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFFEF8C2), // Light yellow background
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF1B5E20), size: 24),
-          onPressed: () => Navigator.pop(context),
-        ),
+      
         title: const Text(
           'Inventory',
           textAlign: TextAlign.center,

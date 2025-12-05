@@ -20,10 +20,12 @@ dependencies:
   # Firebase dependencies (remove if unused, or update to latest)
   firebase_core: ^4.1.1
   firebase_auth: ^6.1.0
+  firebase_database: ^12.0.3
   cloud_firestore: ^6.0.2
 
   # Network and HTTP utilities
-  connectivity_plus: ^5.0.2
+  connectivity_plus: ^6.0.0
+  network_info_plus: ^5.0.0
   http: ^1.2.0
 
   # WiFi scanning and connection
@@ -37,12 +39,21 @@ dependencies:
   # URL Launcher for opening email, phone, and URLs
   url_launcher: ^6.3.0
 
+  
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
+  
+  app_settings: ^6.0.0  # Add this line
+  wifi_iot: ^0.3.18+1
+  
   # Recommended lints for good coding practices
   flutter_lints: ^5.0.0
+
+  shared_preferences: ^2.3.2
+  mqtt_client: ^10.0.0
+  
 
 # Flutter configuration
 flutter:
@@ -53,6 +64,11 @@ flutter:
     - assets/splash3.png
     - assets/nutricyclelogo.png
     - assets/Logo.png
+    - assets/step1.png
+    - assets/step2.png
+    - assets/step3.png
+    - assets/step4.png
+    - assets/iconchicken.png
   # Material Icons
   uses-material-design: true
 

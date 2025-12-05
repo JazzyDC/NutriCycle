@@ -28,7 +28,7 @@ class ForgotPasswordScreen extends StatefulWidget {
   }
 
   static Future<void> sendVerificationEmail(String email, String code) async {
-    const String apiKey = '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';
+    const String apiKey = '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';
     final url = Uri.parse('https://api.brevo.com/v3/smtp/email');
 
     try {

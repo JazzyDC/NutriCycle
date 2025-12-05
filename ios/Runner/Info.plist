@@ -49,5 +49,22 @@
 	<array>
 		<string>https</string>
 	</array>
+	
+	<!-- WiFi and Location Permissions -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app needs location permission to detect WiFi network names and connect to NutriCycle machines.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>This app needs location permission to scan for nearby WiFi networks and connect to NutriCycle machines.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>This app needs to access local network to connect and communicate with NutriCycle machines.</string>
+	<key>UIRequiresPersistentWiFi</key>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app needs location to detect Wi-Fi networks.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>This app needs location to detect Wi-Fi networks.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+<string>Need to detect Wi-Fi network name.</string>
+	<true/>
+	
 </dict>
 </plist>

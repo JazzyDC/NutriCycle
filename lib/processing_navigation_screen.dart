@@ -1,153 +1,357 @@
+
+
 import 'package:flutter/material.dart';
 
-class ProcessingStatusScreen extends StatefulWidget {
-  const ProcessingStatusScreen({super.key});
+class ProcessingNavigationScreen extends StatefulWidget {
+  const ProcessingNavigationScreen({super.key});
 
   @override
-  _ProcessingStatusScreenState createState() => _ProcessingStatusScreenState();
+  State<ProcessingNavigationScreen> createState() =>
+      _ProcessingNavigationScreenState();
 }
 
-class _ProcessingStatusScreenState extends State<ProcessingStatusScreen> {
-  final List<Map<String, dynamic>> preparationChecklist = [
-    {'text': 'Ensure machine is powered off', 'completed': false},
-    {'text': 'Load vegetable waste into hopper', 'completed': false},
-    {'text': 'Check water supply levels', 'completed': false},
-    {'text': 'Secure all safety guards', 'completed': false},
-  ];
-  bool isPreparationComplete = false;
+class _ProcessingNavigationScreenState
+    extends State<ProcessingNavigationScreen> with TickerProviderStateMixin {
+  int currentIndex = 0;
+  late List<AnimationController> _controllers;
+  late List<Animation<double>> _animations;
 
-  void toggleChecklistItem(int index) {
-    setState(() {
-      preparationChecklist[index]['completed'] = !preparationChecklist[index]['completed'];
-      isPreparationComplete = preparationChecklist.every((item) => item['completed']);
+  final List<StepData> steps = [
+    StepData(
+      'Step:1',
+      'Power Check',
+      'Make sure that the machine is On',
+      'assets/step1.png',
+      'Proceed',
+    ),
+    StepData(
+      'Step:2',
+      'Pre-Manual Sorting',
+      'Remove non-biodegradable waste that may cause harm to the machine',
+      'assets/step2.png',
+      'Proceed',
+    ),
+    StepData(
+      'Step:3',
+      'Load Waste',
+      'Load Vegetable waste into the hopper of the machine',
+      'assets/step3.png',
+      'Proceed',
+    ),
+    StepData(
+      'Step:4',
+      'Secure Safety',
+      'Ensure all safety guards are properly secured',
+      'assets/step4.png',
+      'Start Process',
+    ),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _controllers = List.generate(
+      4,
+      (_) => AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 600),
+      ),
+    );
+    _animations = _controllers
+        .map((c) => Tween<double>(begin: 0, end: 1).animate(
+              CurvedAnimation(parent: c, curve: Curves.easeOutCubic),
+            ))
+        .toList();
+  }
+
+  void nextStep() {
+    if (currentIndex >= steps.length - 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Starting Process...')),
+      );
+      return;
+    }
+
+    _controllers[currentIndex].forward().then((_) {
+      setState(() => currentIndex++);
+      if (currentIndex < _controllers.length) {
+        _controllers[currentIndex].value = 0;
+      }
     });
   }
 
-  void proceedToNextStage() {
-    if (isPreparationComplete) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => NextStageScreen(),
-        ),
-      );
+  void previousStep() {
+    if (currentIndex > 0) {
+      setState(() {
+        currentIndex--;
+        _controllers[currentIndex].value = 0;
+      });
     }
+  }
+
+  @override
+  void dispose() {
+    for (var c in _controllers) {
+      c.dispose();
+    }
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFFEF8C2),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center, // Center the title
-              children: [
-                const Text(
-                  'Processing Status',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0B440E),
-                  ),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFFEF8C2),
+        elevation: 0,
+        centerTitle: true,
+        leading: currentIndex > 0
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back, color: Color(0xFF0B440E)),
+                onPressed: previousStep,
+              )
+            : null,
+        title: const Text(
+          'Machine Guidelines',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0B440E),
+          ),
+        ),
+      ),
+      body: Column(
+        children: [
+          const SizedBox(height: 20),
+          
+          // Card Stack
+          Expanded(
+            child: Center(
+              child: SizedBox(
+                width: 380,
+                height: 580,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: List.generate(4, (i) {
+                    if (i < currentIndex) return const SizedBox();
+
+                    final isTop = i == currentIndex;
+                    final anim = _animations[i];
+                    final step = steps[i];
+                    final depth = 3 - i;
+
+                    return AnimatedBuilder(
+                      animation: anim,
+                      builder: (context, child) {
+                        final offset = isTop
+                            ? Offset(anim.value * 2.5, anim.value * -1.5)
+                            : Offset.zero;
+                        final scale = isTop
+                            ? (1 - anim.value * 0.1)
+                            : (0.94 + (i * 0.02));
+                        final opacity = isTop ? (1 - anim.value) : 1.0;
+
+                        return Transform.translate(
+                          offset: offset,
+                          child: Transform.scale(
+                            scale: scale,
+                            child: Opacity(
+                              opacity: opacity,
+                              child: Padding(
+                                padding: EdgeInsets.only(
+                                  top: depth * 8.0,
+                                  left: depth * 6.0,
+                                ),
+                                child: ClipPath(
+                                  clipper: CardWithNotchClipper(),
+                                  child: Container(
+                                    width: 340,
+                                    height: 510,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 24,
+                                      vertical: 32,
+                                    ),
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF0B440E),
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          step.step,
+                                          style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 5),
+                                        Text(
+                                          step.title,
+                                          style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                        const SizedBox(height: 30),
+                                        Container(
+                                          padding: const EdgeInsets.all(30),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(20),
+                                          ),
+                                          child: Image.asset(
+                                            step.image,
+                                            height: 180,
+                                            width: 180,
+                                            fit: BoxFit.contain,
+                                            errorBuilder:
+                                                (context, error, stackTrace) {
+                                              return Container(
+                                                height: 180,
+                                                width: 180,
+                                                color: Colors.grey[200],
+                                                child: const Icon(
+                                                  Icons.image,
+                                                  size: 80,
+                                                  color: Colors.grey,
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                        const SizedBox(height: 30),
+                                        Text(
+                                          step.description,
+                                          style: const TextStyle(
+                                            fontSize: 18,
+                                            color: Colors.white,
+                                            height: 1.5,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                        const Spacer(),
+                                        if (isTop)
+                                          ElevatedButton(
+                                            onPressed: nextStep,
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor:
+                                                  const Color(0xFFFEF8C2),
+                                              foregroundColor:
+                                                  const Color(0xFF0B440E),
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 60,
+                                                vertical: 16,
+                                              ),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                              elevation: 0,
+                                            ),
+                                            child: Text(
+                                              step.buttonText,
+                                              style: const TextStyle(
+                                                fontSize: 20,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  }).reversed.toList(),
                 ),
-              ],
+              ),
             ),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(16.0),
+          ),
+
+          // Information Box
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+            child: Container(
+              width: double.infinity,
+              constraints: const BoxConstraints(
+                minHeight: 140,
+              ),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF0B440E)),
+                border: Border.all(
+                  color: const Color(0xFF0B440E),
+                  width: 2,
+                ),
               ),
-              child: Column(
+              child: const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Current Status: Preparation',
+                  Text(
+                    'Information:',
                     style: TextStyle(
-                      fontSize: 18,
                       fontWeight: FontWeight.bold,
+                      fontSize: 16,
                       color: Color(0xFF0B440E),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  ...List.generate(preparationChecklist.length, (index) {
-                    final item = preparationChecklist[index];
-                    return CheckboxListTile(
-                      title: Text(item['text']),
-                      value: item['completed'],
-                      onChanged: (_) => toggleChecklistItem(index),
-                      activeColor: const Color(0xFF0B440E),
-                      checkColor: Colors.white,
-                    );
-                  }),
-                  const SizedBox(height: 10),
-                  ElevatedButton(
-                    onPressed: isPreparationComplete ? proceedToNextStage : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0B440E),
-                      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      disabledBackgroundColor: const Color(0xFF0B440E).withOpacity(0.6),
-                    ),
-                    child: const Text(
-                      'Proceed to Next Stage',
-                      style: TextStyle(
-                        color: Color(0xFFFEF8C2),
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  SizedBox(height: 12),
+                  Text(
+                    'These guidelines ensure safe and proper operation of the NutriCycle machine. Following these steps helps prevent damage, maintains consistent performance, and keeps users safe during the processing of waste.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.6,
+                      color: Color(0xFF0B440E),
                     ),
                   ),
                 ],
               ),
             ),
-            const Spacer(),
-            Center(
-              child: ElevatedButton(
-                onPressed: () {
-                  // Placeholder for starting the process
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0B440E),
-                  padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                ),
-                child: const Text(
-                  'Start',
-                  style: TextStyle(
-                    color: Color(0xFFFEF8C2),
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class NextStageScreen extends StatelessWidget {
-  const NextStageScreen({super.key});
+class CardWithNotchClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    const radius = 25.0;
+    const notchW = 80.0;
+    const notchH = 30.0;
+    final path = Path()
+      ..moveTo(radius, 0)
+      ..lineTo(size.width - radius, 0)
+      ..quadraticBezierTo(size.width, 0, size.width, radius)
+      ..lineTo(size.width, size.height - notchH - radius)
+      ..quadraticBezierTo(size.width, size.height - notchH,
+          size.width - radius, size.height - notchH)
+      ..lineTo(size.width / 2 + notchW / 2, size.height - notchH)
+      ..lineTo(size.width / 2, size.height)
+      ..lineTo(size.width / 2 - notchW / 2, size.height - notchH)
+      ..lineTo(radius, size.height - notchH)
+      ..quadraticBezierTo(
+          0, size.height - notchH, 0, size.height - notchH - radius)
+      ..lineTo(0, radius)
+      ..quadraticBezierTo(0, 0, radius, 0)
+      ..close();
+    return path;
+  }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Next Stage')),
-      body: const Center(child: Text('Recognition Stage')),
-    );
-  }
+  bool shouldReclip(_) => false;
+}
+
+class StepData {
+  final String step, title, description, image, buttonText;
+  StepData(this.step, this.title, this.description, this.image, this.buttonText);
 }
