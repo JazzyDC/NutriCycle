@@ -1,20 +1,12 @@
 workflows:
   ios-release-no-shorebird:
-    name: iOS release
+    name: iOS Release
     environment:
       flutter: stable
       xcode: latest
     scripts:
-      # Clean previous builds
-      - flutter clean
-      # Get dependencies
-      - flutter pub get
-      # Build the iOS app for release (device)
-      - flutter build ios --release --no-codesign
-      # Create Payload folder for IPA
-      - mkdir -p build/ios/ipa/Payload
-      - cp -r build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
-      # Zip into IPA
-      - cd build/ios/ipa && zip -r Runner.ipa Payload && cd ../../..
+      - flutter build ios --simulator
+      - mkdir -p build/ios/ipa
+      - zip -r build/ios/ipa/Runner.app.zip build/ios/iphonesimulator/Runner.app
     artifacts:
-      - build/ios/ipa/Runner.ipa
+      - build/ios/ipa/Runner.app.zip
