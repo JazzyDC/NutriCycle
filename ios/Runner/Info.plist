@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Nutricycle</string>
+	<string>NutriCycle</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -26,8 +26,6 @@
 	<true/>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
-	<key>UIMainStoryboardFile</key>
-	<string>Main</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
@@ -45,26 +43,28 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+	<!-- Open links with https -->
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>https</string>
 	</array>
-	
-	<!-- WiFi and Location Permissions -->
+
+	<!-- Required for Wi-Fi network detection (SSID) on iOS 14+ -->
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>This app needs location permission to detect WiFi network names and connect to NutriCycle machines.</string>
+	<string>This app needs location access to detect nearby Wi-Fi networks and connect to NutriCycle machines.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>This app needs location permission to scan for nearby WiFi networks and connect to NutriCycle machines.</string>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>This app needs to access local network to connect and communicate with NutriCycle machines.</string>
-	<key>UIRequiresPersistentWiFi</key>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>This app needs location to detect Wi-Fi networks.</string>
+	<string>This app needs location access to detect nearby Wi-Fi networks and connect to NutriCycle machines.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
-	<string>This app needs location to detect Wi-Fi networks.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-<string>Need to detect Wi-Fi network name.</string>
+	<string>This app needs location access to detect nearby Wi-Fi networks and connect to NutriCycle machines.</string>
+
+	<!-- Required for local network communication (mDNS/Bonjour) -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>This app needs local network access to discover and communicate with NutriCycle machines on your Wi-Fi.</string>
+
+	<!-- Keeps Wi-Fi alive in background (optional but recommended) -->
+	<key>UIRequiresPersistentWiFi</key>
 	<true/>
-	
+
 </dict>
 </plist>
