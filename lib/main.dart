@@ -11,19 +11,16 @@ import 'dashboard_screen.dart';
 import 'forgot_password/forgot_password_screen.dart';
 import 'forgot_password/verification_screenpassword.dart';
 import 'processing_navigation_screen.dart';
-import 'recognition_screen.dart ';
-
+// FIXED: removed the trailing space here
+import 'recognition_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await Firebase.initializeApp();
-    // Replace print with a logging mechanism in production
     debugPrint('Firebase initialized successfully');
   } catch (e) {
-    // Handle Firebase initialization failure gracefully
     debugPrint('Firebase initialization error: $e');
-    // Optionally, show an error screen or retry initialization
   }
   runApp(const MyApp());
 }
@@ -39,9 +36,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSwatch(
           primarySwatch: Colors.green,
-        ).copyWith(
-          surface: Colors.white, // Ensure Material 3 compatibility
-        ),
+        ).copyWith(surface: Colors.white),
         useMaterial3: true,
       ),
       home: const AuthWrapper(),
@@ -54,36 +49,22 @@ class MyApp extends StatelessWidget {
         '/dashboard': (context) => const DashboardScreen(),
         '/forgot_password': (context) => const ForgotPasswordScreen(),
         '/verification_screens': (context) => const VerificationSScreen(),
-        
+        // This one was missing in your routes map – added it so you can navigate directly
+        '/processing_navigation': (context) => const ProcessingNavigationScreen(),
         '/recognition_screen': (context) => const RecognitionScreen(),
       },
       onGenerateRoute: (settings) {
+        // Handles /verification_screen?email=...&code=...
         if (settings.name == '/verification_screen') {
-          // Safely handle arguments
-          if (settings.arguments is Map<String, String>?) {
-            final args = settings.arguments as Map<String, String>?;
-            return MaterialPageRoute(
-              builder:
-                  (context) => VerificationScreen(
-                    email: args?['email'] ?? '',
-                    verificationCode: args?['verificationCode'] ?? '',
-                  ),
-            );
-          }
-          // Fallback for invalid arguments
+          final args = settings.arguments as Map<String, String>?;
           return MaterialPageRoute(
-            builder:
-                (context) => const Scaffold(
-                  body: Center(child: Text('Invalid verification arguments')),
-                ),
+            builder: (context) => VerificationScreen(
+              email: args?['email'] ?? '',
+              verificationCode: args?['verificationCode'] ?? '',
+            ),
           );
         }
-        // Improved fallback for unknown routes
-        return MaterialPageRoute(
-          builder:
-              (context) =>
-                  const Scaffold(body: Center(child: Text('Page not found'))),
-        );
+        return null; // let Flutter use the normal routes map for everything else
       },
     );
   }
@@ -98,25 +79,21 @@ class AuthWrapper extends StatelessWidget {
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          debugPrint('StreamBuilder error: ${snapshot.error}');
           return const Scaffold(
-            body: Center(child: Text('Error loading authentication state')),
+            body: Center(child: Text('Authentication error')),
           );
         }
 
         if (snapshot.connectionState == ConnectionState.waiting) {
-          debugPrint('StreamBuilder: Waiting for auth state');
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
         }
 
         if (snapshot.hasData && snapshot.data != null) {
-          debugPrint('User logged in: ${snapshot.data!.email}');
           return const DashboardScreen();
         }
 
-        debugPrint('No user logged in, showing SplashScreen1');
         return const SplashScreen1();
       },
     );
