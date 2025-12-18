@@ -69,6 +69,7 @@ flutter:
     - assets/step3.png
     - assets/step4.png
     - assets/iconchicken.png
+    - assets/composticon.png
   # Material Icons
   uses-material-design: true
 

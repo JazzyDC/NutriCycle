@@ -9,220 +9,240 @@ class InventoryScreen extends StatefulWidget {
 }
 
 class _InventoryScreenState extends State<InventoryScreen> {
-  int _activeTab = 0; // 0 for Animal Feed, 1 for Compost
-  String _quantity = '12 KG';
-  String _lastBatchDate = '2024-07-26';
+  int _expandedBin = -1; // -1 = none expanded
 
-  @override
-  void initState() {
-    super.initState();
-    _fetchData();
+  void _toggleExpand(int index) {
+    setState(() {
+      _expandedBin = _expandedBin == index ? -1 : index;
+    });
   }
 
-  Future<void> _fetchData() async {
+  // Safely get document by ID
+  DocumentSnapshot? _docById(List<QueryDocumentSnapshot> docs, String id) {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('inventory')
-          .doc(_activeTab == 0 ? 'animal_feed' : 'compost')
-          .get();
-      if (snapshot.exists) {
-        setState(() {
-          _quantity = snapshot.get('quantity') ?? '12 KG';
-          _lastBatchDate = snapshot.get('lastBatchDate') ?? '2024-07-26';
-        });
-      }
+      return docs.firstWhere((doc) => doc.id == id);
     } catch (e) {
-      print('Error fetching data: $e');
-      // Optionally show a snackbar or alert for the user
-    }
-  }
-
-  void _switchTab(int index) {
-    if (_activeTab != index) {
-      setState(() {
-        _activeTab = index;
-      });
-      _fetchData(); // Fetch new data when tab changes
+      return null;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFEF8C2), // Light yellow background
+      backgroundColor: const Color(0xFFFEF8C2),
       appBar: AppBar(
-      
-        title: const Text(
-          'Inventory',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            fontFamily: 'Poppins',
-            color: Color(0xFF1B5E20), // Dark green title
-          ),
-        ),
+        title: const Text('Inventory',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20), fontFamily: 'Poppins')),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
-        toolbarHeight: 60, // Matches the app bar height in the image
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch, // Ensure full width alignment
-          children: [
-            const SizedBox(height: 16), // Top padding to align with image
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween, // Even spacing with full width
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance.collection('inventory').snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator(color: Color(0xFF1B5E20)));
+          }
+
+          final docs = snapshot.data!.docs;
+          final animalFeedDoc = _docById(docs, 'animal_feed');
+          final compostDoc = _docById(docs, 'compost');
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
               children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => _switchTab(0),
-                    child: Text(
-                      'Animal Feed',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        fontFamily: 'Poppins',
-                        color: _activeTab == 0 ? Color(0xFF1B5E20) : Color(0xFF4F7942),
-                      ),
-                    ),
-                  ),
+                _buildBinCard(
+                  doc: animalFeedDoc,
+                  title: "Animal Feed Bin",
+                  icon: 'assets/iconchicken.png',
+                  isExpanded: _expandedBin == 0,
+                  onTap: () => _toggleExpand(0),
                 ),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => _switchTab(1),
-                    child: Text(
-                      'Compost',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        fontFamily: 'Poppins',
-                        color: _activeTab == 1 ? Color(0xFF1B5E20) : Color(0xFF4F7942),
-                      ),
-                    ),
-                  ),
+                const SizedBox(height: 16),
+                _buildBinCard(
+                  doc: compostDoc,
+                  title: "Vegetable Compost Bin",
+                  icon: 'assets/composticon.png',
+                  isExpanded: _expandedBin == 1,
+                  onTap: () => _toggleExpand(1),
+                  showCollectionTime: true,
                 ),
               ],
             ),
-            const SizedBox(height: 4), // Reduced height for tighter divider spacing
-            const Divider(
-              color: Color(0xFF1B5E20), // Dark green divider
-              thickness: 2,
-              height: 2,
-            ),
-            const SizedBox(height: 24), // Increased spacing to match card positioning
-            _buildInfoCard(
-              title: 'Quantity Produced',
-              icon: Icons.line_weight, // Valid icon for weight
-              value: _quantity,
-              isCompleted: true,
-            ),
-            const SizedBox(height: 16), // Spacing between cards
-            _buildInfoCard(
-              title: 'Last Batch Date',
-              icon: Icons.calendar_today,
-              value: _lastBatchDate,
-              isCompleted: true,
-            ),
-            const SizedBox(height: 32), // Larger bottom padding to center button
-            Center(
-              child: ElevatedButton(
-                onPressed: () {
-                  // Add completion logic here
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1B5E20), // Dark green button
-                  foregroundColor: const Color(0xFFFEF8C2), // Light yellow text
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16), // Matches rounded edges
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildBinCard({
+    required DocumentSnapshot? doc,
+    required String title,
+    required String icon,
+    required bool isExpanded,
+    required VoidCallback onTap,
+    bool showCollectionTime = false,
+  }) {
+    // No data yet → clean "waiting" card (exactly like your old design)
+    if (doc == null || !doc.exists) {
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE0E0E0)),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Image.asset(icon, width: 50, height: 50, color: Colors.grey[400]),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF1B5E20))),
+                        const SizedBox(height: 8),
+                        Text("Waiting for data...", style: TextStyle(color: Colors.grey[600])),
+                      ],
+                    ),
                   ),
-                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 40),
-                  minimumSize: const Size(320, 55), // Exact size from image
-                ),
-                child: const Text(
-                  'Completed',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    fontFamily: 'Poppins',
-                  ),
-                ),
+                  const Icon(Icons.keyboard_arrow_down, color: Color(0xFF1B5E20)),
+                ],
               ),
             ),
-            const SizedBox(height: 16), // Bottom padding
-          ],
+          ),
+        ),
+      );
+    }
+
+    // Data exists → real values from Firebase
+    final data = doc.data() as Map<String, dynamic>;
+    final double used = (data['storageUsed'] as num?)?.toDouble() ?? 0.0;
+    final double total = (data['storageTotal'] as num?)?.toDouble() ?? 3.0;
+    final double progress = total > 0 ? used / total : 0.0;
+
+    // EXPANDED CARD (Dark Green)
+    if (isExpanded) {
+      return Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF2D5016),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 10, offset: const Offset(0, 4))],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              InkWell(
+                onTap: onTap,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFFFEF8C2), fontFamily: 'Poppins')),
+                    const SizedBox(width: 10),
+                    const Icon(Icons.keyboard_arrow_up, color: Color(0xFFFEF8C2), size: 30),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text('Status: ${data['status'] ?? 'Loading...'}', style: const TextStyle(fontSize: 16, color: Color(0xFFFEF8C2))),
+              const SizedBox(height: 20),
+
+              // Circular Progress
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  SizedBox(
+                    width: 140, height: 140,
+                    child: CircularProgressIndicator(
+                      value: progress,
+                      strokeWidth: 10,
+                      backgroundColor: Colors.white.withOpacity(0.3),
+                      valueColor: AlwaysStoppedAnimation(progress < 0.8 ? const Color(0xFFFEF8C2) : Colors.red),
+                    ),
+                  ),
+                  Image.asset(icon, width: 70, height: 70, color: const Color(0xFFFEF8C2)),
+                ],
+              ),
+
+              const SizedBox(height: 30),
+              _row('Capacity:', '${total.toStringAsFixed(1)} kg'),
+              _row('Current Load:', '${used.toStringAsFixed(1)} kg'),
+              _row('Remaining:', '${(total - used).toStringAsFixed(1)} kg'),
+              _row('Optimal Temp:', data['optimalTemp'] ?? '28-32°C'),
+              if (showCollectionTime && data['estimatedCollection'] != null)
+                _row('Collection In:', data['estimatedCollection']),
+              _row('Last Cleaned:', data['lastCleaned'] ?? 'Never'),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // COLLAPSED CARD (White with progress bar — your original look)
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE0E0E0)),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          backgroundColor: Colors.grey[300],
+                          valueColor: const AlwaysStoppedAnimation(Color(0xFF1B5E20)),
+                          minHeight: 8,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Icon(Icons.keyboard_arrow_down, color: Color(0xFF1B5E20), size: 28),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF1B5E20), fontFamily: 'Poppins')),
+                const SizedBox(height: 4),
+                Text('${used.toStringAsFixed(1)} kg out of ${total.toStringAsFixed(1)} kg',
+                    style: TextStyle(color: Colors.grey[700])),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildInfoCard({
-    required String title,
-    required IconData icon,
-    required String value,
-    required bool isCompleted,
-  }) {
-    return Container(
-      width: double.infinity, // Full width to match card design
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _row(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  fontFamily: 'Poppins',
-                  color: Color(0xFF1B5E20),
-                ),
-              ),
-              if (isCompleted)
-                const Text(
-                  'Completed',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                    fontFamily: 'Poppins',
-                    color: Color(0xFF1B5E20),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(icon, color: const Color(0xFF1B5E20), size: 24),
-              const SizedBox(width: 12), // Increased spacing for alignment
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Poppins',
-                  color: Color(0xFF1B5E20),
-                ),
-              ),
-            ],
-          ),
+          Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFFEF8C2), fontSize: 15)),
+          const SizedBox(width: 10),
+          Text(value, style: const TextStyle(color: Color(0xFFFEF8C2), fontSize: 15)),
         ],
       ),
     );

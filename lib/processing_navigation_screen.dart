@@ -1,319 +1,352 @@
-
-
 import 'package:flutter/material.dart';
+import 'dart:async';
+
+typedef StatusUpdateCallback = void Function(String currentTask, String mode);
 
 class ProcessingNavigationScreen extends StatefulWidget {
-  const ProcessingNavigationScreen({super.key});
+  final StatusUpdateCallback? onStatusUpdate;
+
+  const ProcessingNavigationScreen({super.key, this.onStatusUpdate});
 
   @override
-  State<ProcessingNavigationScreen> createState() =>
-      _ProcessingNavigationScreenState();
+  State<ProcessingNavigationScreen> createState() => _ProcessingNavigationScreenState();
 }
 
-class _ProcessingNavigationScreenState
-    extends State<ProcessingNavigationScreen> with TickerProviderStateMixin {
+class _ProcessingNavigationScreenState extends State<ProcessingNavigationScreen> {
+  bool isProcessing = false;
+  bool isCompostMode = false;
   int currentIndex = 0;
-  late List<AnimationController> _controllers;
-  late List<Animation<double>> _animations;
+  Timer? _timer;
 
-  final List<StepData> steps = [
-    StepData(
-      'Step:1',
-      'Power Check',
-      'Make sure that the machine is On',
-      'assets/step1.png',
-      'Proceed',
+  final String wifiName = 'NutriCycle-1';
+
+  final List<StepData> guidelineSteps = [
+    StepData('Step: 1', 'Power Check', 'Make sure that the machine is On', 'assets/step1.png', 'Proceed'),
+    StepData('Step: 2', 'Pre-Manual Sorting', 'Remove non-biodegradable waste that may cause harm to the machine', 'assets/step2.png', 'Proceed'),
+    StepData('Step: 3', 'Load Waste', 'Load Vegetable waste into the hopper of the machine', 'assets/step3.png', 'Proceed'),
+    StepData('Step: 4', 'Secure Safety', 'Ensure all safety guards are properly secured', 'assets/step4.png', 'Start Process'),
+  ];
+
+  final List<ProcessingStepData> animalFeedSteps = [
+    ProcessingStepData(
+      title: 'Recognition',
+      subtitle: 'Analyzing Waste...',
+      description: 'The system identifies and assesses various types of green leafy vegetable waste.',
     ),
-    StepData(
-      'Step:2',
-      'Pre-Manual Sorting',
-      'Remove non-biodegradable waste that may cause harm to the machine',
-      'assets/step2.png',
-      'Proceed',
+    ProcessingStepData(
+      title: 'Sorting',
+      subtitle: 'Determining waste pathway...',
+      description: 'The system categorizes waste based on its type.',
     ),
-    StepData(
-      'Step:3',
-      'Load Waste',
-      'Load Vegetable waste into the hopper of the machine',
-      'assets/step3.png',
-      'Proceed',
+    ProcessingStepData(
+      title: 'Vermicasting',
+      subtitle: 'Initiating vermicasting process...',
+      description: 'The system processes the waste for composting.',
     ),
-    StepData(
-      'Step:4',
-      'Secure Safety',
-      'Ensure all safety guards are properly secured',
-      'assets/step4.png',
-      'Start Process',
+    ProcessingStepData(
+      title: 'Completion',
+      subtitle: 'Animal feed processing complete.',
+      description: 'Animal feed processing is finished and ready for collection.',
     ),
   ];
+
+  final List<ProcessingStepData> compostSteps = [
+    ProcessingStepData(
+      title: 'Recognition',
+      subtitle: 'Analyzing Waste...',
+      description: 'The system identifies and assesses various types of green leafy vegetable waste.',
+    ),
+    ProcessingStepData(
+      title: 'Sorting',
+      subtitle: 'Determining waste pathway...',
+      description: 'The system categorizes waste based on its type.',
+    ),
+    ProcessingStepData(
+      title: 'Vermicasting',
+      subtitle: 'Initiating vermicasting process...',
+      description: 'The system processes the waste for composting.',
+    ),
+    ProcessingStepData(
+      title: 'Completion',
+      subtitle: 'Compost processing complete.',
+      description: 'Compost processing is finished and ready for collection.',
+    ),
+  ];
+
+  late List<ProcessingStepData> currentProcessingSteps;
 
   @override
   void initState() {
     super.initState();
-    _controllers = List.generate(
-      4,
-      (_) => AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 600),
-      ),
-    );
-    _animations = _controllers
-        .map((c) => Tween<double>(begin: 0, end: 1).animate(
-              CurvedAnimation(parent: c, curve: Curves.easeOutCubic),
-            ))
-        .toList();
-  }
+    currentProcessingSteps = animalFeedSteps;
 
-  void nextStep() {
-    if (currentIndex >= steps.length - 1) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Starting Process...')),
-      );
-      return;
-    }
-
-    _controllers[currentIndex].forward().then((_) {
-      setState(() => currentIndex++);
-      if (currentIndex < _controllers.length) {
-        _controllers[currentIndex].value = 0;
-      }
+    // FIXED: Delay initial status notification until after first frame build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _notifyStatus();
     });
   }
 
-  void previousStep() {
-    if (currentIndex > 0) {
-      setState(() {
-        currentIndex--;
-        _controllers[currentIndex].value = 0;
-      });
+  void _notifyStatus() {
+    if (!mounted) return; // Safety check
+
+    if (!isProcessing) {
+      widget.onStatusUpdate?.call('Idle', 'None');
+      return;
     }
+    final currentStep = currentProcessingSteps[currentIndex];
+    final mode = isCompostMode ? 'Compost Process' : 'Animal Feed Process';
+    widget.onStatusUpdate?.call(currentStep.title, mode);
+  }
+
+  void nextStep() {
+    if (!isProcessing && currentIndex == guidelineSteps.length - 1) {
+      setState(() {
+        isProcessing = true;
+        isCompostMode = false;
+        currentProcessingSteps = animalFeedSteps;
+        currentIndex = 0;
+      });
+      _notifyStatus();
+      startProcessingTimer();
+    } else if (!isProcessing) {
+      setState(() => currentIndex++);
+      _notifyStatus(); // Optional: notify on guideline step change if needed
+    }
+  }
+
+  void previousStep() {
+    if (!isProcessing && currentIndex > 0) {
+      setState(() => currentIndex--);
+      _notifyStatus(); // Optional
+    }
+  }
+
+  void startProcessingTimer() {
+    _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      if (!mounted) return;
+      setState(() {
+        if (currentIndex < currentProcessingSteps.length - 1) {
+          currentIndex++;
+          _notifyStatus();
+        } else {
+          timer.cancel();
+          if (!isCompostMode) {
+            setState(() {
+              isCompostMode = true;
+              currentProcessingSteps = compostSteps;
+              currentIndex = 0;
+            });
+            _notifyStatus();
+            startProcessingTimer();
+          }
+        }
+      });
+    });
+  }
+
+  void doneOrForceStop() {
+    _timer?.cancel();
+    _timer = null;
+    setState(() {
+      isProcessing = false;
+      isCompostMode = false;
+      currentIndex = 0;
+      currentProcessingSteps = animalFeedSteps;
+    });
+    _notifyStatus();
   }
 
   @override
   void dispose() {
-    for (var c in _controllers) {
-      c.dispose();
-    }
+    _timer?.cancel();
     super.dispose();
+  }
+
+  String getAppBarTitle() {
+    if (!isProcessing) return 'Machine Guidelines';
+    return isCompostMode ? 'Compost Process – $wifiName' : 'Animal Feed Process – $wifiName';
+  }
+
+  String getCurrentTaskLabel() {
+    return isCompostMode ? 'Current Task: Compost Process' : 'Current Task: Animal Feed Process';
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFEF8C2),
+      backgroundColor: const Color(0xFFFEF7D6),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFFEF8C2),
+        backgroundColor: const Color(0xFFFEF7D6),
         elevation: 0,
         centerTitle: true,
-        leading: currentIndex > 0
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back, color: Color(0xFF0B440E)),
-                onPressed: previousStep,
-              )
-            : null,
-        title: const Text(
-          'Machine Guidelines',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF0B440E),
-          ),
+        automaticallyImplyLeading: false,
+        title: Text(
+          getAppBarTitle(),
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Color(0xFF1B5E20)),
         ),
       ),
-      body: Column(
+      body: isProcessing ? _buildProcessingView() : _buildGuidelineView(),
+    );
+  }
+
+  Widget _buildGuidelineView() {
+    final step = guidelineSteps[currentIndex];
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
         children: [
-          const SizedBox(height: 20),
-          
-          // Card Stack
-          Expanded(
-            child: Center(
-              child: SizedBox(
-                width: 380,
-                height: 580,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: List.generate(4, (i) {
-                    if (i < currentIndex) return const SizedBox();
-
-                    final isTop = i == currentIndex;
-                    final anim = _animations[i];
-                    final step = steps[i];
-                    final depth = 3 - i;
-
-                    return AnimatedBuilder(
-                      animation: anim,
-                      builder: (context, child) {
-                        final offset = isTop
-                            ? Offset(anim.value * 2.5, anim.value * -1.5)
-                            : Offset.zero;
-                        final scale = isTop
-                            ? (1 - anim.value * 0.1)
-                            : (0.94 + (i * 0.02));
-                        final opacity = isTop ? (1 - anim.value) : 1.0;
-
-                        return Transform.translate(
-                          offset: offset,
-                          child: Transform.scale(
-                            scale: scale,
-                            child: Opacity(
-                              opacity: opacity,
-                              child: Padding(
-                                padding: EdgeInsets.only(
-                                  top: depth * 8.0,
-                                  left: depth * 6.0,
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1B5E20),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Stack(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      Text(step.step, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFFFEF7D6))),
+                      const SizedBox(height: 10),
+                      Text(step.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFFFEF7D6)), textAlign: TextAlign.center),
+                      const SizedBox(height: 24),
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.asset(
+                            step.image,
+                            height: 180,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                height: 180,
+                                color: Colors.grey[200],
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.image_not_supported, size: 50, color: Colors.grey[400]),
+                                    const SizedBox(height: 8),
+                                    Text('Image not found', style: TextStyle(color: Colors.grey[600])),
+                                    Text(step.image, style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+                                  ],
                                 ),
-                                child: ClipPath(
-                                  clipper: CardWithNotchClipper(),
-                                  child: Container(
-                                    width: 340,
-                                    height: 510,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 24,
-                                      vertical: 32,
-                                    ),
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFF0B440E),
-                                    ),
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          step.step,
-                                          style: const TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 5),
-                                        Text(
-                                          step.title,
-                                          style: const TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white,
-                                          ),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                        const SizedBox(height: 30),
-                                        Container(
-                                          padding: const EdgeInsets.all(30),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(20),
-                                          ),
-                                          child: Image.asset(
-                                            step.image,
-                                            height: 180,
-                                            width: 180,
-                                            fit: BoxFit.contain,
-                                            errorBuilder:
-                                                (context, error, stackTrace) {
-                                              return Container(
-                                                height: 180,
-                                                width: 180,
-                                                color: Colors.grey[200],
-                                                child: const Icon(
-                                                  Icons.image,
-                                                  size: 80,
-                                                  color: Colors.grey,
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                        const SizedBox(height: 30),
-                                        Text(
-                                          step.description,
-                                          style: const TextStyle(
-                                            fontSize: 18,
-                                            color: Colors.white,
-                                            height: 1.5,
-                                          ),
-                                          textAlign: TextAlign.center,
-                                        ),
-                                        const Spacer(),
-                                        if (isTop)
-                                          ElevatedButton(
-                                            onPressed: nextStep,
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor:
-                                                  const Color(0xFFFEF8C2),
-                                              foregroundColor:
-                                                  const Color(0xFF0B440E),
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 60,
-                                                vertical: 16,
-                                              ),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                              ),
-                                              elevation: 0,
-                                            ),
-                                            child: Text(
-                                              step.buttonText,
-                                              style: const TextStyle(
-                                                fontSize: 20,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
+                              );
+                            },
                           ),
-                        );
-                      },
-                    );
-                  }).reversed.toList(),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(step.description, style: const TextStyle(fontSize: 16, color: Color(0xFFFEF7D6), height: 1.5), textAlign: TextAlign.center),
+                      const SizedBox(height: 32),
+                      ElevatedButton(
+                        onPressed: nextStep,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFEF7D6),
+                          foregroundColor: const Color(0xFF1B5E20),
+                          minimumSize: const Size(double.infinity, 56),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: Text(step.buttonText, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
                 ),
+                if (currentIndex > 0)
+                  Positioned(
+                    top: 16,
+                    left: 16,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(30),
+                        onTap: previousStep,
+                        child: const Padding(
+                          padding: EdgeInsets.all(8),
+                          child: Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFFFEF7D6), size: 28),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFDE7),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF1B5E20), width: 2),
+            ),
+            child: RichText(
+              textAlign: TextAlign.left,
+              text: const TextSpan(
+                style: TextStyle(fontSize: 15, height: 1.6, color: Color(0xFF1B5E20)),
+                children: [
+                  TextSpan(text: 'Information:\n', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                  TextSpan(text: 'These guidelines ensure safe and proper operation of the NutriCycle machine. Following these steps helps prevent damage, maintains consistent performance, and keeps users safe during the processing of waste.'),
+                ],
               ),
             ),
           ),
+          const SizedBox(height: 30),
+        ],
+      ),
+    );
+  }
 
-          // Information Box
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-            child: Container(
-              width: double.infinity,
-              constraints: const BoxConstraints(
-                minHeight: 140,
-              ),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFF0B440E),
-                  width: 2,
+  Widget _buildProcessingView() {
+    final step = currentProcessingSteps[currentIndex];
+    final bool isLastStep = currentIndex == currentProcessingSteps.length - 1;
+    final bool showDoneButton = isCompostMode && isLastStep;
+
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          Text(getCurrentTaskLabel(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF1B5E20))),
+          const SizedBox(height: 20),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(32),
+                  decoration: BoxDecoration(color: const Color(0xFF1B5E20), borderRadius: BorderRadius.circular(16)),
+                  child: Column(
+                    children: [
+                      Text(step.title, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Color(0xFFFEF7D6)), textAlign: TextAlign.center),
+                      const SizedBox(height: 12),
+                      Text(step.subtitle, style: const TextStyle(fontSize: 20, color: Color(0xFFFEF7D6)), textAlign: TextAlign.center),
+                      const SizedBox(height: 60),
+                      Text(step.description, style: const TextStyle(fontSize: 17, color: Color(0xFFFEF7D6), height: 1.5), textAlign: TextAlign.center),
+                    ],
+                  ),
                 ),
-              ),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Information:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: Color(0xFF0B440E),
-                    ),
+                const SizedBox(height: 40),
+                Text('Step ${currentIndex + 1} of ${currentProcessingSteps.length}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20))),
+                const SizedBox(height: 40),
+                ElevatedButton(
+                  onPressed: doneOrForceStop,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: showDoneButton ? const Color(0xFF1B5E20) : Colors.redAccent,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(240, 56),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  SizedBox(height: 12),
-                  Text(
-                    'These guidelines ensure safe and proper operation of the NutriCycle machine. Following these steps helps prevent damage, maintains consistent performance, and keeps users safe during the processing of waste.',
-                    style: TextStyle(
-                      fontSize: 14,
-                      height: 1.6,
-                      color: Color(0xFF0B440E),
-                    ),
+                  child: Text(
+                    showDoneButton ? 'Done' : 'Force Stop',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],
@@ -322,36 +355,12 @@ class _ProcessingNavigationScreenState
   }
 }
 
-class CardWithNotchClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) {
-    const radius = 25.0;
-    const notchW = 80.0;
-    const notchH = 30.0;
-    final path = Path()
-      ..moveTo(radius, 0)
-      ..lineTo(size.width - radius, 0)
-      ..quadraticBezierTo(size.width, 0, size.width, radius)
-      ..lineTo(size.width, size.height - notchH - radius)
-      ..quadraticBezierTo(size.width, size.height - notchH,
-          size.width - radius, size.height - notchH)
-      ..lineTo(size.width / 2 + notchW / 2, size.height - notchH)
-      ..lineTo(size.width / 2, size.height)
-      ..lineTo(size.width / 2 - notchW / 2, size.height - notchH)
-      ..lineTo(radius, size.height - notchH)
-      ..quadraticBezierTo(
-          0, size.height - notchH, 0, size.height - notchH - radius)
-      ..lineTo(0, radius)
-      ..quadraticBezierTo(0, 0, radius, 0)
-      ..close();
-    return path;
-  }
-
-  @override
-  bool shouldReclip(_) => false;
-}
-
 class StepData {
   final String step, title, description, image, buttonText;
   StepData(this.step, this.title, this.description, this.image, this.buttonText);
+}
+
+class ProcessingStepData {
+  final String title, subtitle, description;
+  ProcessingStepData({required this.title, required this.subtitle, required this.description});
 }

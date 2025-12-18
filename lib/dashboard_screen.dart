@@ -26,13 +26,11 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   bool _isConnected = false;
   bool _isConnecting = false;
   String _connectedNetworkName = '';
-  late AnimationController _animationController;
-  late Animation<double> _animation;
 
   final Map<String, dynamic> _machineStatus = {
     'currentStage': 'Waiting for machine...',
-    'lastSync': '10:40 AM',
-    'currentTask': 'Sorting',
+    'lastSync': '—',
+    'currentTask': '—',
     'stages': {
       'Preparation': {'completed': false, 'time': ''},
       'Recognition': {'completed': false, 'time': ''},
@@ -43,13 +41,21 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     },
   };
 
-  double _animalFeedKg = 1.2;
+  // Real values — start at zero or empty
+  double _animalFeedKg = 0.0;
   double _animalFeedMax = 3.0;
-  double _compostKg = 1.2;
+  double _compostKg = 0.0;
   double _compostMax = 2.5;
-  double _totalProcessedFeed = 1.2;
-  double _totalCompost = 1.2;
-  double _wasteDiverted = 0.5;
+  double _totalProcessedFeed = 0.0;
+  double _totalCompost = 0.0;
+  double _wasteDiverted = 0.0;
+
+  // Live status from Processing screen
+  String _currentProcessingTask = 'Idle';
+  String _currentProcessingMode = 'None';
+
+  // Track full process completion
+  bool _isProcessCompleted = false;
 
   late final List<Widget> _screens;
 
@@ -63,19 +69,23 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   @override
   void initState() {
     super.initState();
-    
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
-    
-    _animation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-    
+
     _screens = [
-      _buildDashboardScreen(),
-      const ProcessingNavigationScreen(),
+      Container(), // Placeholder — real dashboard inserted in build()
+      ProcessingNavigationScreen(
+        onStatusUpdate: (task, mode) {
+          if (!mounted) return;
+
+          setState(() {
+            _currentProcessingTask = task;
+            _currentProcessingMode = mode;
+
+            if (task == 'Completion' && mode == 'Compost Process') {
+              _isProcessCompleted = true;
+            }
+          });
+        },
+      ),
       const InventoryScreen(),
       const BatchHistoryScreen(),
       const SettingsScreen(),
@@ -87,7 +97,6 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
 
   @override
   void dispose() {
-    _animationController.dispose();
     _connectivitySubscription.cancel();
     _disconnectMqtt();
     super.dispose();
@@ -125,6 +134,8 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
       _connectedNetworkName = '';
       _isConnecting = false;
       _machineStatus['currentStage'] = 'Waiting for machine...';
+      _machineStatus['lastSync'] = '—';
+      _machineStatus['currentTask'] = '—';
       _machineStatus['stages'].forEach((key, _) {
         _machineStatus['stages'][key] = {'completed': false, 'time': ''};
       });
@@ -173,6 +184,9 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
       if (data is Map<String, dynamic>) {
         setState(() {
           _machineStatus['currentStage'] = data['currentStage'] ?? 'Idle';
+          _machineStatus['lastSync'] = data['lastSync'] ?? '—'; // You can update this from MQTT if available
+          _machineStatus['currentTask'] = data['currentTask'] ?? '—';
+
           final stages = data['stages'] as Map<String, dynamic>? ?? {};
           _machineStatus['stages'].forEach((key, _) {
             final stage = stages[key];
@@ -190,8 +204,60 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     }
   }
 
-  // --------------------------- UI ---------------------------
-  Widget _buildDashboardScreen() {
+  // --------------------------- UI HELPERS ---------------------------
+  Widget _buildInfoRow(String label, String value) {
+    return Row(
+      children: [
+        Text(label, style: const TextStyle(fontSize: 14, fontFamily: 'Poppins', color: Color(0xFF666666))),
+        const SizedBox(width: 8),
+        if (label == 'Status:' && value == 'Online')
+          Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF1B5E20), shape: BoxShape.circle)),
+        if (label == 'Status:' && value == 'Online') const SizedBox(width: 6),
+        Expanded(
+          child: Text(value,
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, fontFamily: 'Poppins', color: value == 'Online' ? const Color(0xFF1B5E20) : Colors.grey[700])),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStageIndicator(String label, bool completed) {
+    return Column(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: completed ? const Color(0xFF1B5E20) : Colors.transparent,
+            border: Border.all(color: completed ? const Color(0xFF1B5E20) : Colors.grey[400]!, width: 2),
+          ),
+          child: completed ? const Icon(Icons.check, color: Colors.white, size: 18) : null,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInventoryBin(String label, double current, double max) {
+    final percentage = (current / max).clamp(0.0, 1.0);
+    return Column(
+      children: [
+        SizedBox(
+          width: 100,
+          height: 100,
+          child: CustomPaint(painter: ArcProgressPainter(percentage: percentage, strokeWidth: 12, activeColor: const Color(0xFF1B5E20), inactiveColor: Colors.grey[300]!)),
+        ),
+        const SizedBox(height: 12),
+        Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, fontFamily: 'Poppins', color: Color(0xFF1B5E20))),
+        const SizedBox(height: 4),
+        Text('${current.toStringAsFixed(1)} kg / ${max.toStringAsFixed(1)} kg',
+            style: TextStyle(fontSize: 11, fontFamily: 'Poppins', color: Colors.grey[600])),
+      ],
+    );
+  }
+
+  // --------------------------- DASHBOARD CONTENT ---------------------------
+  Widget _buildDashboardContent() {
     return Container(
       color: const Color(0xFFFEF8C2),
       child: SingleChildScrollView(
@@ -209,7 +275,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                     ),
                     const SizedBox(height: 24),
 
-                    // MAIN CARD – TOTAL PROCESSED FEED (CHICKEN ICON)
+                    // MAIN CARD – TOTAL PROCESSED FEED
                     Container(
                       decoration: BoxDecoration(
                         color: const Color(0xFF1B5E20),
@@ -304,7 +370,11 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                 children: [
                   // Device Status Card
                   Container(
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 2))]),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 2))],
+                    ),
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -320,21 +390,28 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                         const SizedBox(height: 12),
                         _buildInfoRow('Status:', _isConnected ? 'Online' : 'Offline'),
                         const SizedBox(height: 8),
-                        _buildInfoRow('Last Sync:', _isConnected ? _machineStatus['lastSync'] : '—'),
+                        _buildInfoRow('Last Sync:', _machineStatus['lastSync']),
                         const SizedBox(height: 8),
-                        _buildInfoRow('Current Task:', _isConnected ? _machineStatus['currentTask'] : '—'),
+                        _buildInfoRow('Current Task:', _machineStatus['currentTask']),
                       ],
                     ),
                   ),
                   const SizedBox(height: 16),
 
+                  // Current Status Card
                   Container(
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 2))]),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 2))],
+                    ),
                     child: Material(
                       color: Colors.transparent,
                       child: InkWell(
                         borderRadius: BorderRadius.circular(16),
-                        onTap: () {},
+                        onTap: () {
+                          setState(() => _currentIndex = 1);
+                        },
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: Column(
@@ -342,21 +419,29 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text('Current Status: ${_machineStatus['currentTask']}',
-                                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, fontFamily: 'Poppins', color: Color(0xFF1B5E20))),
+                                  Text(
+                                    'Current Status: $_currentProcessingTask',
+                                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, fontFamily: 'Poppins', color: Color(0xFF1B5E20)),
+                                  ),
                                   const Icon(Icons.chevron_right, color: Color(0xFF1B5E20), size: 24),
                                 ],
                               ),
+                              const SizedBox(height: 8),
+                              if (_currentProcessingMode != 'None')
+                                Text(
+                                  _currentProcessingMode,
+                                  style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                                ),
                               const SizedBox(height: 20),
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   _buildStageIndicator('Preparation', true),
-                                  _buildStageIndicator('Recognition', true),
-                                  _buildStageIndicator('Sorting', true),
-                                  _buildStageIndicator('Grinding', false),
+                                  _buildStageIndicator('Recognition', _currentProcessingTask != 'Idle'),
+                                  _buildStageIndicator('Sorting', _currentProcessingTask == 'Sorting' || _currentProcessingTask == 'Vermicasting' || _currentProcessingTask == 'Completion'),
+                                  _buildStageIndicator('Vermicasting', _currentProcessingTask == 'Vermicasting' || _currentProcessingTask == 'Completion'),
                                   _buildStageIndicator('Depositing', false),
-                                  _buildStageIndicator('Completion', false),
+                                  _buildStageIndicator('Completion', _isProcessCompleted),
                                 ],
                               ),
                               const SizedBox(height: 12),
@@ -366,7 +451,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                                   Text('Preparation', style: TextStyle(fontSize: 9, fontFamily: 'Poppins')),
                                   Text('Recognition', style: TextStyle(fontSize: 9, fontFamily: 'Poppins')),
                                   Text('Sorting', style: TextStyle(fontSize: 9, fontFamily: 'Poppins')),
-                                  Text('Grinding', style: TextStyle(fontSize: 9, fontFamily: 'Poppins')),
+                                  Text('Vermicasting', style: TextStyle(fontSize: 9, fontFamily: 'Poppins')),
                                   Text('Depositing', style: TextStyle(fontSize: 9, fontFamily: 'Poppins')),
                                   Text('Completion', style: TextStyle(fontSize: 9, fontFamily: 'Poppins')),
                                 ],
@@ -379,8 +464,13 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                   ),
                   const SizedBox(height: 16),
 
+                  // Inventory Card
                   Container(
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 2))]),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 2))],
+                    ),
                     child: Material(
                       color: Colors.transparent,
                       child: InkWell(
@@ -421,62 +511,16 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
-    return Row(
-      children: [
-        Text(label, style: const TextStyle(fontSize: 14, fontFamily: 'Poppins', color: Color(0xFF666666))),
-        const SizedBox(width: 8),
-        if (label == 'Status:' && value == 'Online')
-          Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF1B5E20), shape: BoxShape.circle)),
-        if (label == 'Status:' && value == 'Online') const SizedBox(width: 6),
-        Expanded(
-          child: Text(value,
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, fontFamily: 'Poppins', color: value == 'Online' ? const Color(0xFF1B5E20) : Colors.grey[700])),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStageIndicator(String label, bool completed) {
-    return Column(
-      children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: completed ? const Color(0xFF1B5E20) : Colors.transparent,
-            border: Border.all(color: completed ? const Color(0xFF1B5E20) : Colors.grey[400]!, width: 2),
-          ),
-          child: completed ? const Icon(Icons.check, color: Colors.white, size: 18) : null,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildInventoryBin(String label, double current, double max) {
-    final percentage = (current / max).clamp(0.0, 1.0);
-    return Column(
-      children: [
-        SizedBox(
-          width: 100,
-          height: 100,
-          child: CustomPaint(painter: ArcProgressPainter(percentage: percentage, strokeWidth: 12, activeColor: const Color(0xFF1B5E20), inactiveColor: Colors.grey[300]!)),
-        ),
-        const SizedBox(height: 12),
-        Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, fontFamily: 'Poppins', color: Color(0xFF1B5E20))),
-        const SizedBox(height: 4),
-        Text('${current.toStringAsFixed(1)} kg / ${max.toStringAsFixed(1)} kg',
-            style: TextStyle(fontSize: 11, fontFamily: 'Poppins', color: Colors.grey[600])),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    _screens[0] = _buildDashboardContent();
+
     return Scaffold(
       backgroundColor: const Color(0xFFFEF8C2),
-      body: IndexedStack(index: _currentIndex, children: _screens),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
+      ),
       bottomNavigationBar: AnimatedBottomNavBar(
         currentIndex: _currentIndex,
         onTap: (index) {
@@ -489,7 +533,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   }
 }
 
-// Custom Animated Bottom Navigation Bar
+// Bottom navigation and painters remain unchanged (same as previous version)
 class AnimatedBottomNavBar extends StatefulWidget {
   final int currentIndex;
   final Function(int) onTap;
@@ -519,7 +563,7 @@ class _AnimatedBottomNavBarState extends State<AnimatedBottomNavBar> {
     final itemWidth = screenWidth / _items.length;
 
     return Container(
-      height: 75,
+      height: 65,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: const BorderRadius.only(
@@ -537,7 +581,6 @@ class _AnimatedBottomNavBarState extends State<AnimatedBottomNavBar> {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          // Animated yellow curved background
           AnimatedPositioned(
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
@@ -551,7 +594,6 @@ class _AnimatedBottomNavBarState extends State<AnimatedBottomNavBar> {
               ),
             ),
           ),
-          // Animated green circle with icon
           AnimatedPositioned(
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
@@ -578,7 +620,6 @@ class _AnimatedBottomNavBarState extends State<AnimatedBottomNavBar> {
               ),
             ),
           ),
-          // Nav items
           Positioned(
             bottom: 0,
             left: 0,
@@ -597,7 +638,6 @@ class _AnimatedBottomNavBarState extends State<AnimatedBottomNavBar> {
                         mainAxisSize: MainAxisSize.min,
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          // Only show label, icon is in the circle above
                           if (!isSelected)
                             Icon(
                               _items[index].icon,
@@ -642,15 +682,9 @@ class NavItem {
   });
 }
 
-// Custom painter for the curved yellow background
 class CurvedBackgroundPainter extends CustomPainter {
-  final Color color;
-  final double curveHeight; // How deep the curve goes (e.g., 100–200)
-
-  const CurvedBackgroundPainter({
-    this.color = const Color(0xFFFEF8C2),
-    this.curveHeight = 80,
-  });
+  final Color color = const Color(0xFFFEF8C2);
+  final double curveHeight = 80;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -659,20 +693,14 @@ class CurvedBackgroundPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
 
     final path = Path();
-    
-    // Start at top-left
     path.moveTo(0, 0);
-    path.lineTo(0, size.height * 0.3); // Left edge
-    
-    // Smooth downward curve (valley/dip shape like the image)
+    path.lineTo(0, size.height * 0.3);
     path.quadraticBezierTo(
-      size.width * 0.50,              // Control point X → middle
-      size.height * 0.2 + curveHeight, // Control point Y → dip DOWN
-      size.width,                    // End point X → right edge
-      size.height * 0.2,             // End point Y → same height as left
+      size.width * 0.50,
+      size.height * 0.2 + curveHeight,
+      size.width,
+      size.height * 0.2,
     );
-    
-    // Close the shape at top-right
     path.lineTo(size.width, 0);
     path.close();
 
@@ -689,7 +717,12 @@ class ArcProgressPainter extends CustomPainter {
   final Color activeColor;
   final Color inactiveColor;
 
-  ArcProgressPainter({required this.percentage, required this.strokeWidth, required this.activeColor, required this.inactiveColor});
+  ArcProgressPainter({
+    required this.percentage,
+    required this.strokeWidth,
+    required this.activeColor,
+    required this.inactiveColor,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
