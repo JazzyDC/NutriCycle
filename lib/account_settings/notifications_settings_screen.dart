@@ -143,7 +143,7 @@ class _NotificationsSettingsScreenState
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: const Color(0xFF1B5E20),
+            activeThumbColor: const Color(0xFF1B5E20),
             activeTrackColor: const Color(0xFFC8E6C9),
             inactiveThumbColor: Colors.grey[400],
             inactiveTrackColor: Colors.grey[300],

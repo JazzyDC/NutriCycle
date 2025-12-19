@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart'; // For TapGestureRecognizer
 import 'login_screen.dart';
 class SplashScreen3 extends StatelessWidget {
+  const SplashScreen3({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -75,69 +77,8 @@ class SplashScreen3 extends StatelessWidget {
                         ),
                       ),
                     ),
-                    SizedBox(height: 40), // Match spacing from SplashScreen1
-                    RichText(
-                      textAlign: TextAlign.center, // Center align the text
-                      text: TextSpan(
-                        children: [
-                          TextSpan(
-                            text: 'By continuing you agree to our ',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500, // Medium font weight
-                              color: Color(0xFF0B440E),
-                            ),
-                          ),
-                          TextSpan(
-                            text: 'Terms & Conditions',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold, // Bold for emphasis
-                              color: Color(0xFF0B440E),
-                            ),
-                            recognizer: TapGestureRecognizer()
-                              ..onTap = () {
-                                // Add navigation or action for Terms & Conditions
-                                print('Terms & Conditions tapped'); // Placeholder
-                              },
-                          ),
-                          TextSpan(
-                            text: ' and ',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500, // Medium font weight
-                              color: Color(0xFF0B440E),
-                            ),
-                          ),
-                          TextSpan(
-                            text: 'to ',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500, // Medium font weight
-                              color: Color(0xFF0B440E),
-                            ),
-                          ),
-                          TextSpan(
-                            text: 'Privacy Notice',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold, // Bold for emphasis
-                              color: Color(0xFF0B440E),
-                            ),
-                            recognizer: TapGestureRecognizer()
-                              ..onTap = () {
-                                // Add navigation or action for Privacy Notice
-                                print('Privacy Notice tapped'); // Placeholder
-                              },
-                          ),
-                        ],
-                      ),
-                    ),
+                    // Match spacing from SplashScreen1
+                   
                   ],
                 ),
               ),

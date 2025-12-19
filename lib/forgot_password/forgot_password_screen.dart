@@ -1,32 +1,70 @@
 import 'package:flutter/material.dart';
-
-void main() {
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Forgot Password Demo',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.green,
-          primary: Colors.green,
-          surface: const Color(0xFFFFF9C4), // Light yellow background
-        ),
-        useMaterial3: true,
-      ),
-      home: const ForgotPasswordScreen(),
-     
-    );
-  }
-}
+import 'package:firebase_core/firebase_core.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'dart:math';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
+
+  // Static utility functions
+  static Future<String> generateVerificationCode() async {
+    var random = Random();
+    int code = 100000 + random.nextInt(900000);
+    String codeStr = code.toString();
+    if (codeStr.length != 6) {
+      print('Generated code length issue: $codeStr');
+      return '000000';
+    }
+    return codeStr;
+  }
+
+  static Future<void> checkConnectivity() async {
+    var connectivityResult = await Connectivity().checkConnectivity();
+    if (connectivityResult == ConnectivityResult.none) {
+      throw Exception('No internet connection');
+    }
+  }
+
+  static Future<void> sendVerificationEmail(String email, String code) async {
+    const String apiKey = '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';
+    final url = Uri.parse('https://api.brevo.com/v3/smtp/email');
+
+    try {
+      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+        throw Exception('Invalid email address format: $email');
+      }
+
+      final response = await http.post(
+        url,
+        headers: {
+          'api-key': apiKey,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({
+          'sender': {
+            'name': 'NutriCycle',
+            'email': 'micodelacruz519@gmail.com',
+          },
+          'to': [
+            {'email': email, 'name': 'User'},
+          ],
+          'subject': 'Your Password Reset Code',
+          'htmlContent':
+              '<h1>Password Reset Verification</h1><p>Your verification code is <strong>$code</strong>. Please enter it to reset your password.</p>',
+        }),
+      );
+
+      if (response.statusCode != 201) {
+        throw Exception(
+            'Failed to send email. Status: ${response.statusCode}, Message: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Failed to send verification email: $e');
+    }
+  }
 
   @override
   State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
@@ -36,30 +74,52 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _emailController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
+  String? _emailError;
+  String? _generalError;
+
+  @override
+  void initState() {
+    super.initState();
+    Firebase.initializeApp().whenComplete(() {
+      setState(() {});
+    }).catchError((e) {
+      setState(() {
+        _generalError = 'Failed to initialize Firebase: $e';
+      });
+    });
+  }
 
   Future<void> _sendResetLink() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    String email = _emailController.text.trim();
+    setState(() {
+      _isLoading = true;
+      _emailError = null;
+      _generalError = null;
+    });
 
-    // Simulate API call (replace with real email service, e.g., FirebaseAuth.instance.sendPasswordResetEmail(email))
-    await Future.delayed(const Duration(seconds: 2));
-
-    setState(() => _isLoading = false);
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Reset link sent to your email!')),
-      );
-      // Navigate to change password screen (in real app, this could be an email deep link or separate flow)
-      Navigator.pushNamed(context, '/change-password');
+    try {
+      await ForgotPasswordScreen.checkConnectivity();
+      final code = await ForgotPasswordScreen.generateVerificationCode();
+      await ForgotPasswordScreen.sendVerificationEmail(email, code);
+      Navigator.pushNamed(context, '/verification_screens', arguments: {
+        'email': email,
+        'verificationCode': code,
+      });
+    } catch (e) {
+      setState(() {
+        _generalError = 'Failed to send verification code: $e';
+      });
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFEF8C2), // Light yellow
+      backgroundColor: const Color(0xFFFEF8C2),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF0B440E)),
@@ -130,6 +190,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       ),
                       borderRadius: const BorderRadius.all(Radius.circular(8)),
                     ),
+                    errorText: _emailError,
+                    errorStyle: const TextStyle(
+                      color: Colors.red,
+                      fontFamily: 'Poppins',
+                    ),
                   ),
                   style: const TextStyle(
                     fontFamily: 'Poppins',
@@ -139,12 +204,24 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     if (value == null || value.isEmpty) {
                       return 'Please enter your email address';
                     }
-                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                        .hasMatch(value)) {
                       return 'Please enter a valid email address';
                     }
                     return null;
                   },
                 ),
+                if (_generalError != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Text(
+                      _generalError!,
+                      style: const TextStyle(
+                        color: Colors.red,
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                  ),
                 const SizedBox(height: 32),
                 SizedBox(
                   width: double.infinity,
